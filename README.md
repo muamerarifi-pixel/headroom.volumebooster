@@ -13,7 +13,7 @@ Automatic, limiter-protected volume boost for every Chrome tab. Audio stays on y
 
 ## Install
 
-1. **[Download headroom.zip](https://github.com/muamerarifi-pixel/headroom/releases/latest/download/headroom.zip)** and unzip it. You get a folder named `headroom`.
+1. **[Download headroom.zip](https://github.com/muamerarifi-pixel/headroom.volumebooster/releases/latest/download/headroom.zip)** and unzip it. You get a folder named `headroom`.
 2. Move that folder somewhere permanent (for example `Documents/Extensions/headroom`). Chrome loads the extension from this folder, so don't delete it.
 3. Open `chrome://extensions` and turn on **Developer mode** (top right).
 4. Click **Load unpacked** and select the `headroom` folder (the one that contains `manifest.json`).
@@ -22,7 +22,7 @@ Works in Chrome, Edge, Brave and Opera (version 116 or newer).
 
 ## Update
 
-Download [headroom.zip](https://github.com/muamerarifi-pixel/headroom/releases/latest/download/headroom.zip) again, replace the files in your folder, then click the reload ↻ icon on Headroom's card in `chrome://extensions`.
+Download [headroom.zip](https://github.com/muamerarifi-pixel/headroom.volumebooster/releases/latest/download/headroom.zip) again, replace the files in your folder, then click the reload ↻ icon on Headroom's card in `chrome://extensions`.
 
 ## Shortcuts
 

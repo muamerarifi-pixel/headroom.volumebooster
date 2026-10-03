@@ -12,4 +12,4 @@ Headroom is a browser extension that increases the volume of audio playing in br
 
 **Permissions.** Headroom asks for access to websites only so it can route each page's audio and video players through its volume limiter. It does not read or change any other page content.
 
-**Contact.** Questions? Open an issue at https://github.com/muamerarifi-pixel/headroom/issues
+**Contact.** Questions? Open an issue at https://github.com/muamerarifi-pixel/headroom.volumebooster/issues
