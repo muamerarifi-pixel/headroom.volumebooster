@@ -1,0 +1,55 @@
+{
+  "manifest_version": 3,
+  "name": "Headroom",
+  "version": "2.0.0",
+  "description": "Automatic, limiter-protected volume boost for every tab. Audio stays on this device.",
+  "action": {
+    "default_title": "Headroom",
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "permissions": ["tabCapture", "offscreen", "storage", "tabs", "scripting"],
+  "host_permissions": ["<all_urls>"],
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["bridge.js"],
+      "world": "MAIN",
+      "run_at": "document_start",
+      "all_frames": true,
+      "match_about_blank": true
+    },
+    {
+      "matches": ["<all_urls>"],
+      "js": ["dsp.js", "content.js"],
+      "run_at": "document_start",
+      "all_frames": true,
+      "match_about_blank": true
+    }
+  ],
+  "commands": {
+    "toggle-boost": {
+      "suggested_key": { "default": "Alt+Shift+H" },
+      "description": "Turn Headroom on or off"
+    },
+    "deep-capture": {
+      "suggested_key": { "default": "Alt+Shift+B" },
+      "description": "Deep-capture the current tab (press again to stop)"
+    }
+  },
+  "minimum_chrome_version": "116"
+}

@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Headroom</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <div class="app">
+      <header class="header">
+        <div class="brand">
+          <svg class="mark" viewBox="0 0 32 32" aria-hidden="true">
+            <rect x="1.5" y="1.5" width="29" height="29" rx="8" fill="currentColor" opacity="0.08" />
+            <rect
+              x="1.5"
+              y="1.5"
+              width="29"
+              height="29"
+              rx="8"
+              fill="none"
+              stroke="currentColor"
+              stroke-opacity="0.22"
+            />
+            <path d="M7 11h18" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
+            <path
+              d="M7 22c2.2-0.6 3.1-7.4 5.1-7.4S15.2 21 17 21s2.8-8.6 4.8-8.6 2.6 6.2 4.2 3.4"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.8"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+          </svg>
+          <div>
+            <h1>Headroom</h1>
+            <p class="tag">
+              Automatic, limiter-protected volume
+              <span id="live" class="live" hidden>Live</span>
+            </p>
+          </div>
+        </div>
+        <label class="switch-wrap">
+          <span id="enabled-label" class="micro">On</span>
+          <input id="enabled" type="checkbox" checked />
+          <span class="switch" aria-hidden="true"></span>
+        </label>
+      </header>
+
+      <section class="panel">
+        <div class="row-between">
+          <h2>This tab</h2>
+          <span id="mode" class="mode" data-tone="idle">Auto</span>
+        </div>
+        <p id="tab-label" class="tab-label">…</p>
+        <p id="status" class="status" data-tone="idle">Checking this tab…</p>
+        <label class="switch-wrap site-row">
+          <span class="site-text">Boost <b id="site-host">this site</b></span>
+          <input id="site" type="checkbox" checked />
+          <span class="switch" aria-hidden="true"></span>
+        </label>
+        <div class="capture-row">
+          <button id="capture" class="secondary" type="button">Deep capture</button>
+          <button id="stop" class="text-btn" type="button" hidden>Stop capture</button>
+        </div>
+        <p class="hint">
+          Every tab is boosted automatically. Deep capture handles players Headroom can't reach
+          directly (Spotify, Netflix, calls). It starts on its own when you open this panel on one of them.
+        </p>
+        <p id="error" class="error" hidden></p>
+      </section>
+
+      <section class="panel boost">
+        <div class="boost-readout">
+          <div>
+            <span id="boost-db" class="db">+8.0</span>
+            <span class="unit">dB</span>
+          </div>
+          <span id="boost-pct" class="pct">251%</span>
+        </div>
+        <input id="boost" class="fader" type="range" min="0" max="24" step="0.5" value="8" />
+        <div class="fader-legend">
+          <span>0</span>
+          <span>+12</span>
+          <span>+24</span>
+        </div>
+        <div class="pills">
+          <button type="button" data-boost-auto>Auto</button>
+          <button type="button" data-boost="0">Unity</button>
+          <button type="button" data-boost="8">+8</button>
+          <button type="button" data-boost="16">+16</button>
+          <button id="bypass" type="button">A/B</button>
+        </div>
+        <div class="meters">
+          <div class="meter-row">
+            <span>IN</span>
+            <div class="bar">
+              <i id="in-fill"></i>
+              <b id="in-hold"></b>
+            </div>
+            <em id="in-read">–∞</em>
+          </div>
+          <div class="meter-row">
+            <span>OUT</span>
+            <div class="bar">
+              <i id="out-fill"></i>
+              <b id="out-hold"></b>
+            </div>
+            <em id="out-read">–∞</em>
+          </div>
+          <div class="meter-row">
+            <span>GR</span>
+            <div class="bar">
+              <i id="gr-fill" class="warn"></i>
+            </div>
+            <em id="gr-read">0.0</em>
+          </div>
+          <div class="clip-row">
+            <span class="lr">
+              <i id="l-fill"></i>
+              <i id="r-fill"></i>
+            </span>
+            <span id="clip" class="clip">Clip</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>Apply to</h2>
+        <div class="segmented">
+          <button type="button" data-scope="all">All tabs</button>
+          <button type="button" data-scope="active">Only the tab I'm on</button>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>Limiter</h2>
+        <div id="styles" class="styles">
+          <button type="button" data-style="transparent">
+            <strong>Transparent</strong>
+            <span>Makeup gain plus a brickwall. Least color.</span>
+          </button>
+          <button type="button" data-style="balanced" class="active">
+            <strong>Balanced</strong>
+            <span>Light compression into the limiter.</span>
+          </button>
+          <button type="button" data-style="night">
+            <strong>Night</strong>
+            <span>Heavier compression for late listening.</span>
+          </button>
+        </div>
+      </section>
+
+      <footer>
+        <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>H</kbd> on/off · <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>B</kbd> deep capture.
+        Audio is processed locally. Nothing is uploaded.
+      </footer>
+    </div>
+    <script src="dsp.js"></script>
+    <script src="popup.js"></script>
+  </body>
+</html>
