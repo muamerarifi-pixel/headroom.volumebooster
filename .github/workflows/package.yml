@@ -1,0 +1,45 @@
+# Checks the extension and publishes a ready-to-install zip on the Releases page.
+# Direct download: https://github.com/muamerarifi-pixel/headroom/releases/latest/download/headroom.zip
+
+name: Package extension
+
+on:
+  push:
+    branches: ["main"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check manifest and scripts
+        run: |
+          node -e "JSON.parse(require('fs').readFileSync('manifest.json','utf8'))"
+          for f in *.js; do node --check "$f"; done
+
+      - name: Build zips
+        run: |
+          VERSION=$(node -p "require('./manifest.json').version")
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          mkdir -p dist/headroom
+          cp -r manifest.json *.js *.html *.css icons dist/headroom/
+          (cd dist && zip -qr -X headroom.zip headroom)
+          (cd dist/headroom && zip -qr -X ../headroom-store-upload.zip .)
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="v$VERSION"
+          NOTES="Download **headroom.zip**, unzip it, then in chrome://extensions turn on Developer mode → Load unpacked → pick the headroom folder. (headroom-store-upload.zip is for the Chrome Web Store.)"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" dist/headroom.zip dist/headroom-store-upload.zip --clobber
+          else
+            gh release create "$TAG" dist/headroom.zip dist/headroom-store-upload.zip \
+              --title "Headroom $VERSION" --notes "$NOTES" --latest
+          fi
