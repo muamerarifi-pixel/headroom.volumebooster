@@ -1,6 +1,14 @@
 # Headroom
 
-Automatic, limiter-protected volume boost for every Chrome tab. Audio stays on your device.
+Automatic, limiter-protected volume boost. Audio stays on your device.
+
+## Windows app: boost everything on your PC
+
+**[Download Headroom-Setup.exe](windows/dist/Headroom-Setup.exe)** (Windows 10/11, 64-bit)
+
+The Windows app boosts **every** sound the PC plays (browsers, Spotify, games, video players, calls) by up to +24 dB, all the time, with a limiter that stops clipping. See [windows/README.md](windows/README.md) for setup and how it works.
+
+## Chrome extension: boost browser tabs
 
 ![Headroom](docs/screenshot.png)
 

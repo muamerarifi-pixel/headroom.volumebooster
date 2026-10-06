@@ -1,0 +1,47 @@
+# Builds the Windows installer (windows/dist/Headroom-Setup.exe) and keeps a
+# copy on the "windows-v<version>" release.
+
+name: Windows app
+
+on:
+  push:
+    branches: ["main"]
+    paths: ["windows/**", ".github/workflows/windows.yml"]
+  pull_request:
+    paths: ["windows/**", ".github/workflows/windows.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install toolchain
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq mingw-w64 nsis
+
+      - name: Build and test
+        run: ./windows/build.sh
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Headroom-Setup
+          path: windows/dist/Headroom-Setup.exe
+
+      - name: Publish release
+        if: github.event_name != 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION=$(sed -n 's/^!define VERSION "\(.*\)"/\1/p' windows/installer/headroom.nsi)
+          TAG="windows-v$VERSION"
+          NOTES="Run **Headroom-Setup.exe**. When the audio engine asks which devices to use, tick your speakers and headphones."
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" windows/dist/Headroom-Setup.exe --clobber
+          else
+            gh release create "$TAG" windows/dist/Headroom-Setup.exe \
+              --title "Headroom for Windows $VERSION" --notes "$NOTES" --latest=false
+          fi

@@ -1,0 +1,36 @@
+Headroom for Windows
+====================
+
+Headroom boosts the volume of everything your PC plays: browsers, Spotify,
+games, video players, calls and system sounds. A built-in limiter keeps the
+louder sound from clipping or distorting.
+
+How it works
+------------
+Windows doesn't let normal apps change other apps' sound. Headroom therefore
+uses Equalizer APO, a free, open-source audio engine that plugs into Windows'
+own audio processing. Headroom's limiter runs inside that engine, so the boost
+applies to every sound, all the time, even when the Headroom window is closed.
+
+During setup, Equalizer APO asks which audio devices to use. Tick the
+speakers and headphones you listen on.
+
+
+Third-party software
+--------------------
+This installer includes Equalizer APO 1.4.2 (EqualizerAPO-x64-1.4.2.exe),
+unmodified, copyright (C) Jonas Thedering. It is licensed under the
+GNU General Public License, version 2 or later. You can get its full license
+and source code from:
+
+  https://sourceforge.net/projects/equalizerapo/
+  https://sourceforge.net/p/equalizerapo/code/
+
+Equalizer APO is a separate program with its own uninstaller in Windows
+Settings > Apps.
+
+
+Privacy
+-------
+All audio is processed locally on your PC. Headroom has no servers, no
+analytics and no accounts. Nothing is recorded or uploaded.
