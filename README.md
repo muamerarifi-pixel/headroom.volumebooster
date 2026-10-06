@@ -4,7 +4,7 @@ Automatic, limiter-protected volume boost. Audio stays on your device.
 
 ## Windows app: boost everything on your PC
 
-**[Download Headroom-Setup.exe](windows/dist/Headroom-Setup.exe)** (Windows 10/11, 64-bit)
+**[Download Headroom-Setup.exe](https://github.com/muamerarifi-pixel/headroom.volumebooster/releases/latest/download/Headroom-Setup.exe)** (Windows 10/11, 64-bit)
 
 The Windows app boosts **every** sound the PC plays (browsers, Spotify, games, video players, calls) by up to +24 dB, all the time, with a limiter that stops clipping. See [windows/README.md](windows/README.md) for setup and how it works.
 

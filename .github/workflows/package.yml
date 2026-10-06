@@ -1,7 +1,9 @@
-# Checks the extension and publishes a ready-to-install zip on the Releases page.
-# Direct download: https://github.com/muamerarifi-pixel/headroom.volumebooster/releases/latest/download/headroom.zip
+# Checks the extension, builds the Windows installer, and publishes both on the
+# Releases page. Direct downloads:
+#   https://github.com/muamerarifi-pixel/headroom.volumebooster/releases/latest/download/headroom.zip
+#   https://github.com/muamerarifi-pixel/headroom.volumebooster/releases/latest/download/Headroom-Setup.exe
 
-name: Package extension
+name: Package extension and Windows app
 
 on:
   push:
@@ -31,15 +33,23 @@ jobs:
           (cd dist && zip -qr -X headroom.zip headroom)
           (cd dist/headroom && zip -qr -X ../headroom-store-upload.zip .)
 
+      - name: Build Windows installer
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq mingw-w64 nsis
+          ./windows/build.sh
+
       - name: Publish release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           TAG="v$VERSION"
-          NOTES="Download **headroom.zip**, unzip it, then in chrome://extensions turn on Developer mode → Load unpacked → pick the headroom folder. (headroom-store-upload.zip is for the Chrome Web Store.)"
+          ASSETS="dist/headroom.zip dist/headroom-store-upload.zip windows/dist/Headroom-Setup.exe"
+          NOTES="**Windows app (boosts every sound on your PC):** download **Headroom-Setup.exe** and run it. If SmartScreen warns you, click More info → Run anyway. When the audio engine asks which devices to use, tick your speakers and headphones.
+
+          **Chrome extension (boosts browser tabs):** download **headroom.zip**, unzip it, then in chrome://extensions turn on Developer mode → Load unpacked → pick the headroom folder. (headroom-store-upload.zip is for the Chrome Web Store.)"
           if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release upload "$TAG" dist/headroom.zip dist/headroom-store-upload.zip --clobber
+            gh release upload "$TAG" $ASSETS --clobber
+            gh release edit "$TAG" --notes "$NOTES"
           else
-            gh release create "$TAG" dist/headroom.zip dist/headroom-store-upload.zip \
-              --title "Headroom $VERSION" --notes "$NOTES" --latest
+            gh release create "$TAG" $ASSETS --title "Headroom $VERSION" --notes "$NOTES" --latest
           fi
