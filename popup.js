@@ -4,15 +4,29 @@ const ui = {
   enabled: $("enabled"),
   enabledLabel: $("enabled-label"),
   live: $("live"),
+  sitesBtn: $("sites-btn"),
+  mainView: $("main-view"),
+  sitesView: $("sites-view"),
+  sitesBack: $("sites-back"),
+  sitesClear: $("sites-clear"),
+  sitesEmpty: $("sites-empty"),
+  pinnedSection: $("pinned-section"),
+  pinnedList: $("pinned-list"),
+  excludedSection: $("excluded-section"),
+  excludedList: $("excluded-list"),
   mode: $("mode"),
   status: $("status"),
   site: $("site"),
   siteHost: $("site-host"),
   pin: $("pin"),
+  captureFull: $("capture-full"),
+  captureSubtle: $("capture-subtle"),
+  captureLink: $("capture-link"),
   capture: $("capture"),
   stop: $("stop"),
   tabLabel: $("tab-label"),
   error: $("error"),
+  boostPanel: $("boost-panel"),
   boost: $("boost"),
   boostDb: $("boost-db"),
   boostUnit: $("boost-unit"),
@@ -22,6 +36,7 @@ const ui = {
   faderMax: $("fader-max"),
   autoLevel: $("auto-level"),
   voice: $("voice"),
+  mono: $("mono"),
   bypass: $("bypass"),
   styleHint: $("style-hint"),
   inFill: $("in-fill"),
@@ -46,6 +61,7 @@ let lastMeters = ZERO_METERS;
 let autoCaptureTried = false;
 let capturing = false;
 let localError = "";
+let showingSites = false;
 
 const isBlocked = (url) =>
   !url ||
@@ -111,8 +127,15 @@ function updateAudioProfile(mutator) {
 
 // ---- rendering --------------------------------------------------------------
 
+function renderFaderTrack(boostDb) {
+  const pct = ((boostDb - BOOST_MIN) / (BOOST_MAX - BOOST_MIN)) * 100;
+  ui.boost.style.setProperty("--fill", `${Math.max(0, Math.min(100, pct)).toFixed(2)}%`);
+  ui.boost.classList.toggle("dim", !settings.enabled || settings.bypass || siteExcluded());
+}
+
 function renderReadout() {
   const eff = effective();
+  renderFaderTrack(eff.boostDb);
   if (eff.autoLevel) {
     const liveAuto = typeof lastMeters.autoGainDb === "number";
     ui.boostDb.textContent = liveAuto ? formatDb(lastMeters.autoGainDb) : "Auto";
@@ -129,6 +152,107 @@ function renderReadout() {
   }
 }
 
+function savedSitesCount() {
+  return Object.keys(settings.siteOverrides).length + settings.excludedSites.length;
+}
+
+function renderSitesButton() {
+  const count = savedSitesCount();
+  ui.sitesBtn.classList.toggle("active", showingSites);
+  if (showingSites) {
+    ui.sitesBtn.textContent = "Done";
+  } else {
+    ui.sitesBtn.textContent = count > 0 ? `Sites · ${count}` : "Sites";
+  }
+}
+
+function describeOverride(ov) {
+  const parts = [];
+  if (ov.autoLevel) parts.push(`Auto ≤${formatDb(ov.boostDb)} dB`);
+  else parts.push(`${formatDb(ov.boostDb)} dB`);
+  const styleLabel = ov.style.charAt(0).toUpperCase() + ov.style.slice(1);
+  parts.push(styleLabel);
+  if (ov.voiceClarity) parts.push("Voice");
+  if (ov.mono) parts.push("Mono");
+  return parts.join(" · ");
+}
+
+function renderSitesView() {
+  renderSitesButton();
+  ui.mainView.hidden = showingSites;
+  ui.sitesView.hidden = !showingSites;
+  if (!showingSites) return;
+
+  const pinnedEntries = Object.entries(settings.siteOverrides).sort(([a], [b]) => a.localeCompare(b));
+  const excludedHosts = [...settings.excludedSites].sort((a, b) => a.localeCompare(b));
+  const total = pinnedEntries.length + excludedHosts.length;
+
+  ui.sitesEmpty.hidden = total > 0;
+  ui.sitesClear.hidden = total === 0;
+
+  ui.pinnedSection.hidden = pinnedEntries.length === 0;
+  ui.pinnedList.textContent = "";
+  for (const [h, ov] of pinnedEntries) {
+    const li = document.createElement("li");
+    li.className = "site-item";
+    const info = document.createElement("div");
+    info.className = "site-item-info";
+    const title = document.createElement("span");
+    title.className = "site-item-host";
+    title.textContent = h;
+    const meta = document.createElement("span");
+    meta.className = "site-item-meta";
+    meta.textContent = describeOverride(ov);
+    info.append(title, meta);
+
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "site-item-action";
+    btn.textContent = "Reset";
+    btn.addEventListener("click", () => {
+      delete settings.siteOverrides[h];
+      renderSettings();
+      renderTab();
+      renderSitesView();
+      void persist();
+    });
+
+    li.append(info, btn);
+    ui.pinnedList.append(li);
+  }
+
+  ui.excludedSection.hidden = excludedHosts.length === 0;
+  ui.excludedList.textContent = "";
+  for (const h of excludedHosts) {
+    const li = document.createElement("li");
+    li.className = "site-item";
+    const info = document.createElement("div");
+    info.className = "site-item-info";
+    const title = document.createElement("span");
+    title.className = "site-item-host";
+    title.textContent = h;
+    const meta = document.createElement("span");
+    meta.className = "site-item-meta";
+    meta.textContent = "Boost turned off";
+    info.append(title, meta);
+
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "site-item-action";
+    btn.textContent = "Enable";
+    btn.addEventListener("click", () => {
+      settings.excludedSites = settings.excludedSites.filter((x) => x !== h);
+      renderSettings();
+      renderTab();
+      renderSitesView();
+      void persist();
+    });
+
+    li.append(info, btn);
+    ui.excludedList.append(li);
+  }
+}
+
 function renderSettings() {
   const eff = effective();
   const pinned = sitePinned();
@@ -138,11 +262,14 @@ function renderSettings() {
   ui.profileBadge.textContent = pinned ? `Pinned · ${host}` : "Global profile";
   ui.profileBadge.classList.toggle("pinned", pinned);
   renderReadout();
+  renderSitesButton();
 
   ui.autoLevel.classList.add("tone-ok");
   ui.autoLevel.classList.toggle("active", eff.autoLevel);
   ui.voice.classList.add("tone-ok");
   ui.voice.classList.toggle("active", eff.voiceClarity);
+  ui.mono.classList.add("tone-ok");
+  ui.mono.classList.toggle("active", eff.mono);
   ui.bypass.classList.toggle("active", settings.bypass);
 
   document.querySelectorAll("[data-boost]").forEach((btn) => {
@@ -182,6 +309,11 @@ function renderTab() {
     ? `Unpin ${host} and return to your Global profile`
     : `Save a separate boost & limiter profile for ${host || "this site"}`;
 
+  const autoLive =
+    !blocked && settings.enabled && !siteExcluded() && !capturedHere() && !capturing && Boolean(report?.playing);
+
+  ui.captureFull.hidden = autoLive;
+  ui.captureSubtle.hidden = !autoLive;
   ui.capture.hidden = capturedHere();
   ui.capture.disabled = blocked || capturing || !settings.enabled || siteExcluded();
   ui.stop.hidden = !capturedHere();
@@ -294,15 +426,15 @@ async function maybeAutoCapture() {
 
 // ---- adaptive meter loop (25 fps when live, 3 Hz when idle) -----------------
 
-let meterTimer = 0;
 function nextMeterDelay() {
+  if (showingSites) return 350;
   if (capturedHere() || report?.playing) return 40;
   if (report?.hooked || report?.skippedPlaying) return 150;
   return 350;
 }
 
 async function meterTick() {
-  if (document.visibilityState === "visible") {
+  if (document.visibilityState === "visible" && !showingSites) {
     try {
       if (capturedHere()) {
         const r = await chrome.runtime.sendMessage({ type: "CAPTURE_METERS" }).catch(() => null);
@@ -315,7 +447,7 @@ async function meterTick() {
       /* ignore transient IPC failure */
     }
   }
-  meterTimer = setTimeout(() => void meterTick(), nextMeterDelay());
+  setTimeout(() => void meterTick(), nextMeterDelay());
 }
 
 async function statusTick() {
@@ -326,7 +458,27 @@ async function statusTick() {
 
 // ---- controls -----------------------------------------------------------------
 
+ui.sitesBtn.addEventListener("click", () => {
+  showingSites = !showingSites;
+  renderSitesView();
+});
+
+ui.sitesBack.addEventListener("click", () => {
+  showingSites = false;
+  renderSitesView();
+});
+
+ui.sitesClear.addEventListener("click", () => {
+  settings.siteOverrides = {};
+  settings.excludedSites = [];
+  renderSettings();
+  renderTab();
+  renderSitesView();
+  void persist();
+});
+
 ui.capture.addEventListener("click", () => void startCapture());
+ui.captureLink.addEventListener("click", () => void startCapture());
 
 ui.stop.addEventListener("click", async () => {
   await chrome.runtime.sendMessage({ type: "CAPTURE_STOP" });
@@ -369,6 +521,7 @@ ui.pin.addEventListener("click", () => {
         style: settings.style,
         autoLevel: settings.autoLevel,
         voiceClarity: settings.voiceClarity,
+        mono: settings.mono,
       },
       settings,
     );
@@ -396,6 +549,24 @@ ui.boost.addEventListener("input", () => {
   void persist();
 });
 
+// Mouse-wheel fine nudge (±0.5 dB) on the fader / boost panel.
+ui.boostPanel.addEventListener(
+  "wheel",
+  (e) => {
+    if (Math.abs(e.deltaY) < 1) return;
+    e.preventDefault();
+    const delta = e.deltaY < 0 ? BOOST_STEP : -BOOST_STEP;
+    updateAudioProfile((p) => {
+      const next = Math.round((p.boostDb + delta) / BOOST_STEP) * BOOST_STEP;
+      p.boostDb = clampBoost(next, p.boostDb);
+    });
+    settings.enabled = true;
+    renderSettings();
+    void persist();
+  },
+  { passive: false },
+);
+
 ui.autoLevel.addEventListener("click", () => {
   updateAudioProfile((p) => {
     p.autoLevel = !p.autoLevel;
@@ -416,6 +587,15 @@ ui.voice.addEventListener("click", () => {
   void persist();
 });
 
+ui.mono.addEventListener("click", () => {
+  updateAudioProfile((p) => {
+    p.mono = !p.mono;
+  });
+  settings.enabled = true;
+  renderSettings();
+  void persist();
+});
+
 ui.bypass.addEventListener("click", () => {
   settings.bypass = !settings.bypass;
   renderSettings();
@@ -427,7 +607,7 @@ document.querySelectorAll("[data-boost]").forEach((btn) => {
     const val = Number(btn.getAttribute("data-boost"));
     updateAudioProfile((p) => {
       p.boostDb = val;
-      if (val === 0) p.autoLevel = false; // Unity should actually play at 0 dB
+      if (val === 0) p.autoLevel = false; // 0 dB (Unity) should actually play at 0 dB
     });
     settings.enabled = true;
     renderSettings();

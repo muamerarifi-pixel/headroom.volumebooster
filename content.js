@@ -34,9 +34,9 @@
     try {
       const ao = location.ancestorOrigins;
       const origin = ao && ao.length ? ao[ao.length - 1] : location.origin;
-      return new URL(origin).hostname;
+      return normalizeHost(new URL(origin).hostname);
     } catch {
-      return location.hostname;
+      return normalizeHost(location.hostname);
     }
   }
 

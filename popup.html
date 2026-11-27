@@ -40,130 +40,169 @@
             </p>
           </div>
         </div>
-        <label class="switch-wrap">
-          <span id="enabled-label" class="micro">On</span>
-          <input id="enabled" type="checkbox" checked />
-          <span class="switch" aria-hidden="true"></span>
-        </label>
+        <div class="header-actions">
+          <button id="sites-btn" class="sites-btn" type="button" title="Manage pinned and muted sites">
+            Sites
+          </button>
+          <label class="switch-wrap">
+            <span id="enabled-label" class="micro">On</span>
+            <input id="enabled" type="checkbox" checked />
+            <span class="switch" aria-hidden="true"></span>
+          </label>
+        </div>
       </header>
 
-      <section class="panel">
-        <div class="row-between">
-          <h2>This tab</h2>
-          <span id="mode" class="mode" data-tone="idle">Auto</span>
-        </div>
-        <p id="tab-label" class="tab-label">…</p>
-        <p id="status" class="status" data-tone="idle">Checking this tab…</p>
-        <div class="site-bar">
-          <label class="switch-wrap site-toggle">
-            <input id="site" type="checkbox" checked />
-            <span class="switch" aria-hidden="true"></span>
-            <span class="site-text">Boost <b id="site-host">this site</b></span>
-          </label>
-          <button
-            id="pin"
-            class="pin-btn"
-            type="button"
-            title="Save a separate boost & limiter profile for this website"
-          >
-            Pin site
-          </button>
-        </div>
-        <div class="capture-row">
-          <button id="capture" class="secondary" type="button">Deep capture</button>
-          <button id="stop" class="secondary stop-btn" type="button" hidden>Stop capture</button>
-          <span class="hint-inline">Fallback for DRM, Spotify, Netflix &amp; calls</span>
-        </div>
-        <button id="error" class="error" type="button" title="Click to dismiss" hidden></button>
-      </section>
-
-      <section class="panel boost">
-        <div class="boost-readout">
-          <div class="readout-main">
-            <span id="boost-db" class="db">+8.0</span>
-            <span id="boost-unit" class="unit">dB</span>
-          </div>
-          <div class="readout-meta">
-            <span id="profile-badge" class="profile-badge">Global</span>
-            <span id="boost-pct" class="pct">251%</span>
-          </div>
-        </div>
-        <input id="boost" class="fader" type="range" min="0" max="24" step="0.5" value="8" />
-        <div class="fader-legend">
-          <span id="fader-min">0</span>
-          <span id="fader-mid">+12</span>
-          <span id="fader-max">+24</span>
-        </div>
-        <div class="pills">
-          <button id="auto-level" type="button" title="Continuously ride gain to a steady loudness">
-            Auto-Level
-          </button>
-          <button id="voice" type="button" title="Cut rumble below 90 Hz and clarify speech">
-            Voice
-          </button>
-          <button type="button" data-boost="0">Unity</button>
-          <button type="button" data-boost="8">+8</button>
-          <button type="button" data-boost="16">+16</button>
-          <button id="bypass" type="button" title="Temporary dry/wet A/B comparison">A/B</button>
-        </div>
-        <div class="meters">
-          <div class="meter-row">
-            <span>IN</span>
-            <div class="bar">
-              <i id="in-fill"></i>
-              <b id="in-hold"></b>
-            </div>
-            <em id="in-read">–∞</em>
-          </div>
-          <div class="meter-row">
-            <span>OUT</span>
-            <div class="bar">
-              <i id="out-fill"></i>
-              <b id="out-hold"></b>
-            </div>
-            <em id="out-read">–∞</em>
-          </div>
-          <div class="meter-row">
-            <span>GR</span>
-            <div class="bar">
-              <i id="gr-fill" class="warn"></i>
-            </div>
-            <em id="gr-read">0.0</em>
-          </div>
-          <div class="clip-row">
-            <span class="lr">
-              <i id="l-fill"></i>
-              <i id="r-fill"></i>
-            </span>
-            <span id="clip" class="clip">Clip</span>
-          </div>
-        </div>
-      </section>
-
-      <section class="panel controls-panel">
-        <div class="inline-row">
-          <h2>Apply to</h2>
-          <div class="segmented">
-            <button type="button" data-scope="all">All tabs</button>
-            <button type="button" data-scope="active">Active tab</button>
-          </div>
-        </div>
-        <div class="divider"></div>
-        <div class="limiter-block">
+      <div id="main-view" class="view">
+        <section class="panel">
           <div class="row-between">
-            <h2>Limiter</h2>
-            <span id="style-hint" class="style-hint">Light compression into the limiter.</span>
+            <h2>This tab</h2>
+            <span id="mode" class="mode" data-tone="idle">Auto</span>
           </div>
-          <div id="styles" class="segmented segmented-3">
-            <button type="button" data-style="transparent">Transparent</button>
-            <button type="button" data-style="balanced" class="active">Balanced</button>
-            <button type="button" data-style="night">Night</button>
+          <p id="tab-label" class="tab-label">&hellip;</p>
+          <p id="status" class="status" data-tone="idle">Checking this tab&hellip;</p>
+          <div class="site-bar">
+            <label class="switch-wrap site-toggle">
+              <input id="site" type="checkbox" checked />
+              <span class="switch" aria-hidden="true"></span>
+              <span class="site-text">Boost <b id="site-host">this site</b></span>
+            </label>
+            <button
+              id="pin"
+              class="pin-btn"
+              type="button"
+              title="Save a separate boost &amp; limiter profile for this website"
+            >
+              Pin site
+            </button>
           </div>
-        </div>
-      </section>
+          <div id="capture-full" class="capture-row">
+            <button id="capture" class="secondary" type="button">Deep capture</button>
+            <button id="stop" class="secondary stop-btn" type="button" hidden>Stop capture</button>
+            <span class="hint-inline">Fallback for DRM, Spotify, Netflix &amp; calls</span>
+          </div>
+          <div id="capture-subtle" class="capture-subtle" hidden>
+            <span>Auto boosting directly</span>
+            <button id="capture-link" class="link-btn" type="button">Need deep capture?</button>
+          </div>
+          <button id="error" class="error" type="button" title="Click to dismiss" hidden></button>
+        </section>
+
+        <section id="boost-panel" class="panel boost">
+          <div class="boost-readout">
+            <div class="readout-main">
+              <span id="boost-db" class="db">+8.0</span>
+              <span id="boost-unit" class="unit">dB</span>
+            </div>
+            <div class="readout-meta">
+              <span id="profile-badge" class="profile-badge">Global profile</span>
+              <span id="boost-pct" class="pct">251%</span>
+            </div>
+          </div>
+          <input id="boost" class="fader" type="range" min="0" max="24" step="0.5" value="8" />
+          <div class="fader-legend">
+            <span id="fader-min">0</span>
+            <span id="fader-mid">+12</span>
+            <span id="fader-max">+24</span>
+          </div>
+          <div class="pills">
+            <button id="auto-level" type="button" title="Auto-Level: continuously ride gain to a steady loudness">
+              Auto
+            </button>
+            <button id="voice" type="button" title="Voice Clarity: cut rumble below 90 Hz and lift speech">
+              Voice
+            </button>
+            <button id="mono" type="button" title="Mono: sum left &amp; right channels for 1-ear or broken audio">
+              Mono
+            </button>
+            <button type="button" data-boost="0" title="Unity gain (0 dB)">0 dB</button>
+            <button type="button" data-boost="8">+8</button>
+            <button type="button" data-boost="16">+16</button>
+            <button id="bypass" type="button" title="Temporary dry/wet A/B comparison">A/B</button>
+          </div>
+          <div class="meters">
+            <div class="meter-row">
+              <span>IN</span>
+              <div class="bar">
+                <i id="in-fill"></i>
+                <b id="in-hold"></b>
+              </div>
+              <em id="in-read">&ndash;&infin;</em>
+            </div>
+            <div class="meter-row">
+              <span>OUT</span>
+              <div class="bar">
+                <i id="out-fill"></i>
+                <b id="out-hold"></b>
+              </div>
+              <em id="out-read">&ndash;&infin;</em>
+            </div>
+            <div class="meter-row">
+              <span>GR</span>
+              <div class="bar">
+                <i id="gr-fill" class="warn"></i>
+              </div>
+              <em id="gr-read">0.0</em>
+            </div>
+            <div class="clip-row">
+              <span class="lr">
+                <i id="l-fill"></i>
+                <i id="r-fill"></i>
+              </span>
+              <span id="clip" class="clip">Clip</span>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel controls-panel">
+          <div class="inline-row">
+            <h2>Apply to</h2>
+            <div class="segmented">
+              <button type="button" data-scope="all">All tabs</button>
+              <button type="button" data-scope="active">Active tab</button>
+            </div>
+          </div>
+          <div class="divider"></div>
+          <div class="limiter-block">
+            <div class="row-between">
+              <h2>Limiter</h2>
+              <span id="style-hint" class="style-hint">Light compression into the limiter.</span>
+            </div>
+            <div id="styles" class="segmented segmented-3">
+              <button type="button" data-style="transparent">Transparent</button>
+              <button type="button" data-style="balanced" class="active">Balanced</button>
+              <button type="button" data-style="night">Night</button>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <div id="sites-view" class="view" hidden>
+        <section class="panel sites-panel">
+          <div class="row-between">
+            <h2>Saved sites</h2>
+            <div class="sites-head-actions">
+              <button id="sites-clear" class="link-btn danger-link" type="button" hidden>Clear all</button>
+              <button id="sites-back" class="pin-btn" type="button">Back</button>
+            </div>
+          </div>
+          <p id="sites-empty" class="sites-empty">
+            No pinned or muted sites yet. Pin a website or turn boost off for a site from the main view.
+          </p>
+          <div id="sites-scroll" class="sites-scroll">
+            <div id="pinned-section" class="sites-group" hidden>
+              <h3>Pinned profiles</h3>
+              <ul id="pinned-list" class="sites-list"></ul>
+            </div>
+            <div id="excluded-section" class="sites-group" hidden>
+              <h3>Boost turned off</h3>
+              <ul id="excluded-list" class="sites-list"></ul>
+            </div>
+          </div>
+        </section>
+      </div>
 
       <footer>
-        <kbd>Alt+Shift+H</kbd> on/off &middot; <kbd>Alt+Shift+B</kbd> capture &middot; Audio stays local.
+        <kbd>Alt+Shift+H</kbd> on/off &middot; <kbd>Alt+Shift+B</kbd> capture &middot; Scroll slider to nudge.
       </footer>
     </div>
     <script src="dsp.js"></script>

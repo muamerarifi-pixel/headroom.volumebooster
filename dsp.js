@@ -1,5 +1,5 @@
 /*
- * Headroom shared DSP + settings (v2.1).
+ * Headroom shared DSP + settings (v2.2).
  * Loaded by the service worker, the offscreen processor, the popup and the
  * page engine (content script). Uses `var`/function declarations only so it can
  * be evaluated more than once in the same world without throwing.
@@ -9,18 +9,18 @@ var STORAGE_KEY = "headroom.v1";
 
 var STYLE_PARAMS = {
   transparent: {
-    // Hidden makeup gain Chrome's DynamicsCompressor adds (measured); trimmed off
-    // so the boost readout is the real gain and the ceiling sits at limThreshold.
+    // Hidden makeup gain Chrome's DynamicsCompressor adds; trimmed off so the
+    // boost readout is honest and peaks sit cleanly at limThreshold (-0.8 dBFS).
     // In transparent mode the first compressor is true-bypassed completely.
     compBypass: true,
     compMakeupDb: 0,
-    limMakeupDb: 0.76,
+    limMakeupDb: 0.38,
     compThreshold: 0,
     compKnee: 0,
     compRatio: 1,
     compAttack: 0.003,
     compRelease: 0.12,
-    limThreshold: -1.4,
+    limThreshold: -0.8,
     limKnee: 0,
     limRatio: 20,
     limAttack: 0.002,
@@ -28,14 +28,14 @@ var STYLE_PARAMS = {
   },
   balanced: {
     compBypass: false,
-    compMakeupDb: 4.266,
-    limMakeupDb: 0.72,
+    compMakeupDb: 3.8,
+    limMakeupDb: 0.36,
     compThreshold: -16,
     compKnee: 8,
     compRatio: 2.4,
     compAttack: 0.01,
     compRelease: 0.18,
-    limThreshold: -1.4,
+    limThreshold: -0.8,
     limKnee: 0.2,
     limRatio: 20,
     limAttack: 0.0025,
@@ -43,14 +43,14 @@ var STYLE_PARAMS = {
   },
   night: {
     compBypass: false,
-    compMakeupDb: 9.798,
-    limMakeupDb: 0.82,
+    compMakeupDb: 9.2,
+    limMakeupDb: 0.45,
     compThreshold: -26,
     compKnee: 12,
     compRatio: 5,
     compAttack: 0.018,
     compRelease: 0.28,
-    limThreshold: -1.6,
+    limThreshold: -1.0,
     limKnee: 0.4,
     limRatio: 20,
     limAttack: 0.003,
@@ -69,7 +69,7 @@ var BOOST_MAX = 24;
 var BOOST_STEP = 0.5;
 
 // Continuous Auto-Level (gated loudness rider) constants.
-var AUTO_TARGET_RMS = 0.14; // ~ -17.1 dBFS K-weighted RMS
+var AUTO_TARGET_RMS = 0.15; // ~ -16.5 dBFS K-weighted RMS
 var AUTO_GATE_RMS = 0.0063; // ~ -44 dBFS silence gate (holds gain on pauses)
 var AUTO_TICK_MS = 60;
 var AUTO_WINDOW_SEC = 1.5;
@@ -108,10 +108,15 @@ function formatDb(db) {
   return `${sign}${db.toFixed(1)}`;
 }
 
+function normalizeHost(host) {
+  if (typeof host !== "string") return "";
+  return host.trim().toLowerCase().replace(/^www\./, "");
+}
+
 function hostOfUrl(url) {
   if (!url) return "";
   try {
-    return new URL(url).hostname;
+    return normalizeHost(new URL(url).hostname);
   } catch {
     return "";
   }
@@ -131,6 +136,7 @@ function defaultSettings() {
     params: { ...STYLE_PARAMS.balanced },
     autoLevel: false,
     voiceClarity: false,
+    mono: false,
     scope: "all", // "all" = every tab, "active" = only the tab you're looking at
     excludedSites: [],
     siteOverrides: {},
@@ -146,6 +152,7 @@ function normalizeOverride(raw, fallback) {
     style,
     autoLevel: typeof o.autoLevel === "boolean" ? o.autoLevel : Boolean(base.autoLevel),
     voiceClarity: typeof o.voiceClarity === "boolean" ? o.voiceClarity : Boolean(base.voiceClarity),
+    mono: typeof o.mono === "boolean" ? o.mono : Boolean(base.mono),
   };
 }
 
@@ -158,15 +165,17 @@ function normalizeSettings(raw) {
   s.params = { ...STYLE_PARAMS[s.style] };
   s.autoLevel = Boolean(s.autoLevel);
   s.voiceClarity = Boolean(s.voiceClarity);
+  s.mono = Boolean(s.mono);
   s.scope = s.scope === "active" ? "active" : "all";
   s.excludedSites = Array.isArray(s.excludedSites)
-    ? [...new Set(s.excludedSites.filter((h) => typeof h === "string" && h))]
+    ? [...new Set(s.excludedSites.map(normalizeHost).filter(Boolean))]
     : [];
   const overrides = {};
   if (raw && raw.siteOverrides && typeof raw.siteOverrides === "object") {
-    for (const [host, val] of Object.entries(raw.siteOverrides)) {
-      if (typeof host === "string" && host && val && typeof val === "object") {
-        overrides[host] = normalizeOverride(val, s);
+    for (const [rawHost, val] of Object.entries(raw.siteOverrides)) {
+      const h = normalizeHost(rawHost);
+      if (h && val && typeof val === "object") {
+        overrides[h] = normalizeOverride(val, s);
       }
     }
   }
@@ -176,8 +185,9 @@ function normalizeSettings(raw) {
 
 function resolveSettingsForHost(raw, host) {
   const s = normalizeSettings(raw);
-  const excluded = Boolean(host && s.excludedSites.includes(host));
-  const ov = host && s.siteOverrides[host] ? s.siteOverrides[host] : null;
+  const h = normalizeHost(host);
+  const excluded = Boolean(h && s.excludedSites.includes(h));
+  const ov = h && s.siteOverrides[h] ? s.siteOverrides[h] : null;
   if (!ov) {
     return { ...s, excluded, pinned: false };
   }
@@ -188,21 +198,22 @@ function resolveSettingsForHost(raw, host) {
     params: { ...STYLE_PARAMS[ov.style] },
     autoLevel: ov.autoLevel,
     voiceClarity: ov.voiceClarity,
+    mono: ov.mono,
     excluded,
     pinned: true,
   };
 }
 
 /*
- * Safety clipper: bit-exact linear up to 0.90 (-0.92 dBFS), safely above the
- * limiter ceiling (-1.4 dBFS ≈ 0.85), so normal limited material is completely
- * untouched with zero harmonic distortion. Extreme sub-millisecond overshoots
- * hit a smooth tanh knee capped strictly below 0.985 (-0.13 dBFS).
+ * Safety clipper: bit-exact linear up to 0.92 (-0.72 dBFS), safely above the
+ * limiter ceiling (-0.8 dBFS ≈ 0.912), so normal limited material passes with
+ * zero harmonic distortion. Extreme sub-millisecond overshoots hit a smooth
+ * tanh knee capped strictly below 0.99 (-0.09 dBFS).
  */
 function makeSafetyCurve(n) {
   const size = n || 8192;
-  const t = 0.9;
-  const ceiling = 0.985;
+  const t = 0.92;
+  const ceiling = 0.99;
   const headroom = ceiling - t;
   const curve = new Float32Array(size);
   for (let i = 0; i < size; i++) {
@@ -233,6 +244,15 @@ function createGraph(ctx) {
   const input = ctx.createGain();
   const dry = ctx.createGain();
   const wet = ctx.createGain();
+
+  // Click-free stereo <-> mono fold-down stage.
+  // monoPath explicitly downmixes to 1 channel using Web Audio's speakers rule
+  // ((L + R) * 0.5) and upmixes cleanly to both channels into hpf.
+  const stereoPath = ctx.createGain();
+  const monoPath = ctx.createGain();
+  monoPath.channelCount = 1;
+  monoPath.channelCountMode = "explicit";
+  monoPath.channelInterpretation = "speakers";
 
   // Pre-boost conditioning: 25 Hz infrasonic DC/rumble filter (always on in wet
   // path to prevent sub-20 Hz rumble from pumping the limiter), shifting to 90 Hz
@@ -296,6 +316,8 @@ function createGraph(ctx) {
   safety.oversample = "4x";
   dry.gain.value = 0;
   wet.gain.value = 1;
+  stereoPath.gain.value = 1;
+  monoPath.gain.value = 0;
   compDry.gain.value = 0;
   compWet.gain.value = 1;
 
@@ -313,7 +335,11 @@ function createGraph(ctx) {
   dry.connect(analyserPost);
 
   input.connect(wet);
-  wet.connect(hpf);
+  wet.connect(stereoPath);
+  wet.connect(monoPath);
+  stereoPath.connect(hpf);
+  monoPath.connect(hpf);
+
   hpf.connect(mudCut);
   mudCut.connect(presence);
   presence.connect(boost);
@@ -408,6 +434,10 @@ function createGraph(ctx) {
     ramp(wet.gain, active ? 1 : 0, 0.01);
     ramp(dry.gain, active ? 0 : 1, 0.01);
 
+    // Stereo / Mono fold-down.
+    ramp(stereoPath.gain, settings.mono ? 0 : 1, 0.012);
+    ramp(monoPath.gain, settings.mono ? 1 : 0, 0.012);
+
     // Pre-boost conditioning & Voice Clarity EQ.
     ramp(hpf.frequency, settings.voiceClarity ? 90 : 25, 0.02);
     ramp(mudCut.gain, settings.voiceClarity ? -1.5 : 0, 0.02);
@@ -440,7 +470,7 @@ function createGraph(ctx) {
     const decay = 0.985;
     peakHoldIn = Math.max(pre.peak, peakHoldIn * decay);
     peakHoldOut = Math.max(post.peak, peakHoldOut * decay);
-    if (post.peak >= 0.96) clipUntil = performance.now() + 420;
+    if (post.peak >= 0.97) clipUntil = performance.now() + 420;
     const compGr = compBypassed ? 0 : Math.abs(compressor.reduction) * 0.35;
     return {
       peakIn: pre.peak,

@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Headroom",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "description": "Automatic, limiter-protected volume boost for every tab. Audio stays on this device.",
   "action": {
     "default_title": "Headroom",
