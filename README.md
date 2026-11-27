@@ -13,10 +13,12 @@ The Windows app boosts **every** sound the PC plays (browsers, Spotify, games, v
 ![Headroom](docs/screenshot.png)
 
 - **Automatic:** any tab that plays audio or video is boosted the moment it starts. Nothing to click.
-- **Up to +24 dB** with a limiter that keeps the output below 0 dBFS, so it never clips.
+- **Up to +24 dB with studio-grade limiting:** true-bypassable compressor in Transparent mode, 25 Hz infrasonic rumble filter, and a distortion-free 4x-oversampled safety ceiling that keeps output below 0 dBFS.
+- **Auto-Level (gated AGC):** smoothly rides gain over a ~1.5 s loudness window to keep quiet and loud videos consistent, with a silence gate so pauses don't boost hiss.
+- **Voice Clarity:** one-click 90 Hz rumble cut and gentle vocal presence lift for lectures, podcasts, and calls.
+- **Per-site pinning & switch:** turn boost off for any website, or pin a separate boost, Auto-Level, Voice, and limiter profile to a specific host.
 - **Three limiter styles:** Transparent, Balanced and Night.
-- **Per-site switch:** turn the boost off for any website.
-- **"Only the tab I'm on"** mode, if you prefer it.
+- **"Active tab" mode:** boost only the tab you're looking at (works in both Auto and Deep capture).
 - **Deep capture** for players the page boost can't reach (Spotify, Netflix, web calls): open the popup on that tab, or press `Alt+Shift+B`.
 
 ## Install
@@ -43,4 +45,4 @@ Change them at `chrome://extensions/shortcuts`.
 
 ## Privacy
 
-All audio is processed locally in your browser. Headroom has no servers, no analytics and no accounts. Nothing is recorded or uploaded.
+All audio is processed locally in your browser. Headroom has no servers, no analytics and no accounts. Nothing is recorded or uploaded. See [PRIVACY.md](PRIVACY.md) for the full policy.

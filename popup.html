@@ -35,7 +35,7 @@
           <div>
             <h1>Headroom</h1>
             <p class="tag">
-              Automatic, limiter-protected volume
+              Limiter-protected volume
               <span id="live" class="live" hidden>Live</span>
             </p>
           </div>
@@ -54,42 +54,57 @@
         </div>
         <p id="tab-label" class="tab-label">…</p>
         <p id="status" class="status" data-tone="idle">Checking this tab…</p>
-        <label class="switch-wrap site-row">
-          <span class="site-text">Boost <b id="site-host">this site</b></span>
-          <input id="site" type="checkbox" checked />
-          <span class="switch" aria-hidden="true"></span>
-        </label>
+        <div class="site-bar">
+          <label class="switch-wrap site-toggle">
+            <input id="site" type="checkbox" checked />
+            <span class="switch" aria-hidden="true"></span>
+            <span class="site-text">Boost <b id="site-host">this site</b></span>
+          </label>
+          <button
+            id="pin"
+            class="pin-btn"
+            type="button"
+            title="Save a separate boost & limiter profile for this website"
+          >
+            Pin site
+          </button>
+        </div>
         <div class="capture-row">
           <button id="capture" class="secondary" type="button">Deep capture</button>
-          <button id="stop" class="text-btn" type="button" hidden>Stop capture</button>
+          <button id="stop" class="secondary stop-btn" type="button" hidden>Stop capture</button>
+          <span class="hint-inline">Fallback for DRM, Spotify, Netflix &amp; calls</span>
         </div>
-        <p class="hint">
-          Every tab is boosted automatically. Deep capture handles players Headroom can't reach
-          directly (Spotify, Netflix, calls). It starts on its own when you open this panel on one of them.
-        </p>
-        <p id="error" class="error" hidden></p>
+        <button id="error" class="error" type="button" title="Click to dismiss" hidden></button>
       </section>
 
       <section class="panel boost">
         <div class="boost-readout">
-          <div>
+          <div class="readout-main">
             <span id="boost-db" class="db">+8.0</span>
-            <span class="unit">dB</span>
+            <span id="boost-unit" class="unit">dB</span>
           </div>
-          <span id="boost-pct" class="pct">251%</span>
+          <div class="readout-meta">
+            <span id="profile-badge" class="profile-badge">Global</span>
+            <span id="boost-pct" class="pct">251%</span>
+          </div>
         </div>
         <input id="boost" class="fader" type="range" min="0" max="24" step="0.5" value="8" />
         <div class="fader-legend">
-          <span>0</span>
-          <span>+12</span>
-          <span>+24</span>
+          <span id="fader-min">0</span>
+          <span id="fader-mid">+12</span>
+          <span id="fader-max">+24</span>
         </div>
         <div class="pills">
-          <button type="button" data-boost-auto>Auto</button>
+          <button id="auto-level" type="button" title="Continuously ride gain to a steady loudness">
+            Auto-Level
+          </button>
+          <button id="voice" type="button" title="Cut rumble below 90 Hz and clarify speech">
+            Voice
+          </button>
           <button type="button" data-boost="0">Unity</button>
           <button type="button" data-boost="8">+8</button>
           <button type="button" data-boost="16">+16</button>
-          <button id="bypass" type="button">A/B</button>
+          <button id="bypass" type="button" title="Temporary dry/wet A/B comparison">A/B</button>
         </div>
         <div class="meters">
           <div class="meter-row">
@@ -125,35 +140,30 @@
         </div>
       </section>
 
-      <section class="panel">
-        <h2>Apply to</h2>
-        <div class="segmented">
-          <button type="button" data-scope="all">All tabs</button>
-          <button type="button" data-scope="active">Only the tab I'm on</button>
+      <section class="panel controls-panel">
+        <div class="inline-row">
+          <h2>Apply to</h2>
+          <div class="segmented">
+            <button type="button" data-scope="all">All tabs</button>
+            <button type="button" data-scope="active">Active tab</button>
+          </div>
         </div>
-      </section>
-
-      <section class="panel">
-        <h2>Limiter</h2>
-        <div id="styles" class="styles">
-          <button type="button" data-style="transparent">
-            <strong>Transparent</strong>
-            <span>Makeup gain plus a brickwall. Least color.</span>
-          </button>
-          <button type="button" data-style="balanced" class="active">
-            <strong>Balanced</strong>
-            <span>Light compression into the limiter.</span>
-          </button>
-          <button type="button" data-style="night">
-            <strong>Night</strong>
-            <span>Heavier compression for late listening.</span>
-          </button>
+        <div class="divider"></div>
+        <div class="limiter-block">
+          <div class="row-between">
+            <h2>Limiter</h2>
+            <span id="style-hint" class="style-hint">Light compression into the limiter.</span>
+          </div>
+          <div id="styles" class="segmented segmented-3">
+            <button type="button" data-style="transparent">Transparent</button>
+            <button type="button" data-style="balanced" class="active">Balanced</button>
+            <button type="button" data-style="night">Night</button>
+          </div>
         </div>
       </section>
 
       <footer>
-        <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>H</kbd> on/off · <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>B</kbd> deep capture.
-        Audio is processed locally. Nothing is uploaded.
+        <kbd>Alt+Shift+H</kbd> on/off &middot; <kbd>Alt+Shift+B</kbd> capture &middot; Audio stays local.
       </footer>
     </div>
     <script src="dsp.js"></script>

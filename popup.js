@@ -8,14 +8,22 @@ const ui = {
   status: $("status"),
   site: $("site"),
   siteHost: $("site-host"),
+  pin: $("pin"),
   capture: $("capture"),
   stop: $("stop"),
   tabLabel: $("tab-label"),
   error: $("error"),
   boost: $("boost"),
   boostDb: $("boost-db"),
+  boostUnit: $("boost-unit"),
   boostPct: $("boost-pct"),
+  profileBadge: $("profile-badge"),
+  faderMid: $("fader-mid"),
+  faderMax: $("fader-max"),
+  autoLevel: $("auto-level"),
+  voice: $("voice"),
   bypass: $("bypass"),
+  styleHint: $("style-hint"),
   inFill: $("in-fill"),
   outFill: $("out-fill"),
   grFill: $("gr-fill"),
@@ -32,31 +40,38 @@ const ui = {
 let settings = normalizeSettings();
 let tab = null;
 let host = "";
-let capture = { tabId: null, title: "", error: null };
+let capture = { tabId: null, title: "", url: "", error: null, errorTabId: null };
 let report = null; // what the page engine says about this tab
 let lastMeters = ZERO_METERS;
 let autoCaptureTried = false;
 let capturing = false;
+let localError = "";
 
 const isBlocked = (url) =>
   !url ||
   /^(chrome|chrome-extension|edge|about|devtools|chrome-untrusted|view-source):/i.test(url) ||
   /^https:\/\/chrome(webstore)?\.google\.com\/webstore/i.test(url);
 
-function hostOf(url) {
-  try {
-    return new URL(url).hostname;
-  } catch {
-    return "";
-  }
-}
-
+const effective = () => resolveSettingsForHost(settings, host);
 const siteExcluded = () => Boolean(host) && settings.excludedSites.includes(host);
+const sitePinned = () => Boolean(host) && Boolean(settings.siteOverrides[host]);
 const capturedHere = () => Boolean(tab) && capture.tabId === tab.id;
 
 function showError(message) {
-  ui.error.hidden = !message;
-  ui.error.textContent = message || "";
+  localError = message || "";
+  renderError();
+}
+
+function renderError() {
+  const capErr =
+    !capturedHere() &&
+    capture.error &&
+    (!capture.errorTabId || (tab && capture.errorTabId === tab.id))
+      ? capture.error
+      : "";
+  const msg = localError || capErr;
+  ui.error.hidden = !msg;
+  ui.error.textContent = msg;
 }
 
 function formatPeak(peak) {
@@ -83,18 +98,63 @@ async function persist() {
   }
 }
 
+function updateAudioProfile(mutator) {
+  if (sitePinned()) {
+    const ov = normalizeOverride(settings.siteOverrides[host], settings);
+    mutator(ov);
+    settings.siteOverrides[host] = normalizeOverride(ov, settings);
+  } else {
+    mutator(settings);
+    settings = normalizeSettings(settings);
+  }
+}
+
 // ---- rendering --------------------------------------------------------------
 
+function renderReadout() {
+  const eff = effective();
+  if (eff.autoLevel) {
+    const liveAuto = typeof lastMeters.autoGainDb === "number";
+    ui.boostDb.textContent = liveAuto ? formatDb(lastMeters.autoGainDb) : "Auto";
+    ui.boostUnit.textContent = liveAuto ? "dB" : "";
+    ui.boostPct.textContent = `Max ${formatDb(eff.boostDb)} dB`;
+    ui.faderMid.textContent = "+12 max";
+    ui.faderMax.textContent = "+24";
+  } else {
+    ui.boostDb.textContent = formatDb(eff.boostDb);
+    ui.boostUnit.textContent = "dB";
+    ui.boostPct.textContent = `${Math.round(dbToGain(eff.boostDb) * 100)}%`;
+    ui.faderMid.textContent = "+12";
+    ui.faderMax.textContent = "+24";
+  }
+}
+
 function renderSettings() {
+  const eff = effective();
+  const pinned = sitePinned();
   ui.enabled.checked = settings.enabled;
   ui.enabledLabel.textContent = settings.enabled ? "On" : "Off";
-  ui.boost.value = String(settings.boostDb);
-  ui.boostDb.textContent = formatDb(settings.boostDb);
-  ui.boostPct.textContent = `${Math.round(dbToGain(settings.boostDb) * 100)}%`;
+  ui.boost.value = String(eff.boostDb);
+  ui.profileBadge.textContent = pinned ? `Pinned · ${host}` : "Global profile";
+  ui.profileBadge.classList.toggle("pinned", pinned);
+  renderReadout();
+
+  ui.autoLevel.classList.add("tone-ok");
+  ui.autoLevel.classList.toggle("active", eff.autoLevel);
+  ui.voice.classList.add("tone-ok");
+  ui.voice.classList.toggle("active", eff.voiceClarity);
   ui.bypass.classList.toggle("active", settings.bypass);
-  document.querySelectorAll("[data-style]").forEach((btn) => {
-    btn.classList.toggle("active", btn.getAttribute("data-style") === settings.style);
+
+  document.querySelectorAll("[data-boost]").forEach((btn) => {
+    const val = Number(btn.getAttribute("data-boost"));
+    btn.classList.toggle("active", !eff.autoLevel && Math.abs(eff.boostDb - val) < 0.01);
   });
+
+  document.querySelectorAll("[data-style]").forEach((btn) => {
+    btn.classList.toggle("active", btn.getAttribute("data-style") === eff.style);
+  });
+  ui.styleHint.textContent = STYLE_DESCRIPTIONS[eff.style] || "";
+
   document.querySelectorAll("[data-scope]").forEach((btn) => {
     btn.classList.toggle("active", btn.getAttribute("data-scope") === settings.scope);
   });
@@ -109,10 +169,19 @@ function setStatus(text, tone, mode, modeTone) {
 
 function renderTab() {
   const blocked = !tab || isBlocked(tab.url);
+  const pinned = sitePinned();
   ui.tabLabel.textContent = tab?.title || "This tab";
   ui.siteHost.textContent = host || "this site";
   ui.site.checked = !siteExcluded();
   ui.site.disabled = blocked || !host;
+
+  ui.pin.disabled = blocked || !host || siteExcluded();
+  ui.pin.classList.toggle("active", pinned);
+  ui.pin.textContent = pinned ? "Pinned ×" : "Pin site";
+  ui.pin.title = pinned
+    ? `Unpin ${host} and return to your Global profile`
+    : `Save a separate boost & limiter profile for ${host || "this site"}`;
+
   ui.capture.hidden = capturedHere();
   ui.capture.disabled = blocked || capturing || !settings.enabled || siteExcluded();
   ui.stop.hidden = !capturedHere();
@@ -134,16 +203,16 @@ function renderTab() {
     const n = report.playing;
     setStatus(`Boosting ${n === 1 ? "the player" : `${n} players`} on this page automatically.`, "ok", "Auto");
   } else if (report?.waitingGesture) {
-    setStatus("Click once anywhere on the page. Chrome needs that before Headroom can take over the audio.", "warn", "Waiting");
+    setStatus("Click once anywhere on the page so Chrome allows Headroom to boost audio.", "warn", "Waiting");
   } else if (report?.skippedPlaying) {
-    setStatus("This player is protected or served from another site. Use Deep capture.", "warn", "Needs capture");
+    setStatus("This player is protected or cross-origin. Use Deep capture.", "warn", "Needs capture");
   } else if (settings.scope === "active" && report && !report.active) {
     setStatus("Waiting for this tab to be in front.", "idle", "Auto");
   } else {
-    setStatus("Ready. Boost starts by itself as soon as this tab plays audio.", "idle", "Auto");
+    setStatus("Ready. Boost starts automatically as soon as this tab plays audio.", "idle", "Auto");
   }
   ui.live.hidden = !liveNow;
-  if (!capturedHere() && capture.error) showError(capture.error);
+  renderError();
 }
 
 function renderMeters(m) {
@@ -159,6 +228,7 @@ function renderMeters(m) {
   ui.lFill.style.setProperty("--w", String(peakToWidth(m.peakInL) / 100));
   ui.rFill.style.setProperty("--w", String(peakToWidth(m.peakInR) / 100));
   ui.clip.classList.toggle("on", m.clipped);
+  if (effective().autoLevel) renderReadout();
 }
 
 // ---- talking to the page engine and the background --------------------------
@@ -200,6 +270,7 @@ async function startCapture({ auto } = {}) {
       tabId: tab.id,
       streamId,
       title: tab.title,
+      url: tab.url,
     });
     if (!res?.ok && !auto) showError(res?.error || "Could not capture this tab.");
   } finally {
@@ -221,12 +292,17 @@ async function maybeAutoCapture() {
   await startCapture({ auto: true });
 }
 
-// ---- loops: meters every frame (no overlapping requests), status ~4×/s -------
+// ---- adaptive meter loop (25 fps when live, 3 Hz when idle) -----------------
 
-let inflight = false;
+let meterTimer = 0;
+function nextMeterDelay() {
+  if (capturedHere() || report?.playing) return 40;
+  if (report?.hooked || report?.skippedPlaying) return 150;
+  return 350;
+}
+
 async function meterTick() {
-  if (!inflight && document.visibilityState === "visible") {
-    inflight = true;
+  if (document.visibilityState === "visible") {
     try {
       if (capturedHere()) {
         const r = await chrome.runtime.sendMessage({ type: "CAPTURE_METERS" }).catch(() => null);
@@ -235,11 +311,11 @@ async function meterTick() {
         report = await queryPage();
         renderMeters(report?.meters || ZERO_METERS);
       }
-    } finally {
-      inflight = false;
+    } catch {
+      /* ignore transient IPC failure */
     }
   }
-  requestAnimationFrame(meterTick);
+  meterTimer = setTimeout(() => void meterTick(), nextMeterDelay());
 }
 
 async function statusTick() {
@@ -259,6 +335,14 @@ ui.stop.addEventListener("click", async () => {
   renderTab();
 });
 
+ui.error.addEventListener("click", async () => {
+  localError = "";
+  capture.error = null;
+  capture.errorTabId = null;
+  renderError();
+  await chrome.runtime.sendMessage({ type: "CAPTURE_CLEAR_ERROR" }).catch(() => {});
+});
+
 ui.site.addEventListener("change", async () => {
   if (!host) return;
   const set = new Set(settings.excludedSites);
@@ -270,7 +354,28 @@ ui.site.addEventListener("change", async () => {
     await chrome.runtime.sendMessage({ type: "CAPTURE_STOP" });
     await refreshCapture();
   }
+  renderSettings();
   renderTab();
+});
+
+ui.pin.addEventListener("click", () => {
+  if (!host || siteExcluded()) return;
+  if (sitePinned()) {
+    delete settings.siteOverrides[host];
+  } else {
+    settings.siteOverrides[host] = normalizeOverride(
+      {
+        boostDb: settings.boostDb,
+        style: settings.style,
+        autoLevel: settings.autoLevel,
+        voiceClarity: settings.voiceClarity,
+      },
+      settings,
+    );
+  }
+  renderSettings();
+  renderTab();
+  void persist();
 });
 
 ui.enabled.addEventListener("change", () => {
@@ -282,7 +387,30 @@ ui.enabled.addEventListener("change", () => {
 });
 
 ui.boost.addEventListener("input", () => {
-  settings.boostDb = Number(ui.boost.value);
+  const val = Number(ui.boost.value);
+  updateAudioProfile((p) => {
+    p.boostDb = val;
+  });
+  settings.enabled = true;
+  renderSettings();
+  void persist();
+});
+
+ui.autoLevel.addEventListener("click", () => {
+  updateAudioProfile((p) => {
+    p.autoLevel = !p.autoLevel;
+    // Give Auto-Level reasonable headroom if the ceiling was sitting near 0 dB.
+    if (p.autoLevel && p.boostDb < 4) p.boostDb = 16;
+  });
+  settings.enabled = true;
+  renderSettings();
+  void persist();
+});
+
+ui.voice.addEventListener("click", () => {
+  updateAudioProfile((p) => {
+    p.voiceClarity = !p.voiceClarity;
+  });
   settings.enabled = true;
   renderSettings();
   void persist();
@@ -296,26 +424,23 @@ ui.bypass.addEventListener("click", () => {
 
 document.querySelectorAll("[data-boost]").forEach((btn) => {
   btn.addEventListener("click", () => {
-    settings.boostDb = Number(btn.getAttribute("data-boost"));
+    const val = Number(btn.getAttribute("data-boost"));
+    updateAudioProfile((p) => {
+      p.boostDb = val;
+      if (val === 0) p.autoLevel = false; // Unity should actually play at 0 dB
+    });
     settings.enabled = true;
     renderSettings();
     void persist();
   });
 });
 
-document.querySelector("[data-boost-auto]").addEventListener("click", () => {
-  if (lastMeters.rmsIn < 0.004) return;
-  const needed = 20 * Math.log10(0.12 / lastMeters.rmsIn);
-  settings.boostDb = Math.round(Math.min(BOOST_MAX, Math.max(BOOST_MIN, needed)) * 2) / 2;
-  settings.enabled = true;
-  renderSettings();
-  void persist();
-});
-
 document.querySelectorAll("[data-style]").forEach((btn) => {
   btn.addEventListener("click", () => {
-    settings.style = btn.getAttribute("data-style");
-    settings.params = { ...STYLE_PARAMS[settings.style] };
+    const style = btn.getAttribute("data-style");
+    updateAudioProfile((p) => {
+      p.style = style;
+    });
     renderSettings();
     void persist();
   });
@@ -338,12 +463,12 @@ document.querySelectorAll("[data-scope]").forEach((btn) => {
   ]);
   settings = normalizeSettings(stored[STORAGE_KEY]);
   tab = tabs[0] || null;
-  host = hostOf(tab?.url);
+  host = hostOfUrl(tab?.url);
   renderSettings();
   [report] = await Promise.all([queryPage(), refreshCapture()]);
   renderTab();
   if (report?.meters) renderMeters(report.meters);
   await maybeAutoCapture();
-  requestAnimationFrame(meterTick);
-  setInterval(() => void statusTick(), 250);
+  void meterTick();
+  setInterval(() => void statusTick(), 300);
 })();

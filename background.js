@@ -8,11 +8,11 @@ importScripts("dsp.js");
  *    after a user gesture, so it starts from the popup or the keyboard shortcut.
  *
  * All state lives in chrome.storage so nothing is lost when Chrome puts this
- * service worker to sleep (the old version forgot the captured tab after ~30 s).
+ * service worker to sleep.
  */
 
 const CAPTURE_KEY = "headroom.capture";
-const NO_CAPTURE = { tabId: null, title: "", error: null };
+const NO_CAPTURE = { tabId: null, title: "", url: "", error: null, errorTabId: null };
 let creatingOffscreen = null;
 
 function blockedUrl(url) {
@@ -32,7 +32,7 @@ async function setSettings(settings) {
 
 async function getCapture() {
   const stored = await chrome.storage.session.get(CAPTURE_KEY);
-  const cap = stored[CAPTURE_KEY] || NO_CAPTURE;
+  const cap = { ...NO_CAPTURE, ...(stored[CAPTURE_KEY] || {}) };
   if (cap.tabId && !(await hasOffscreen())) {
     await setCapture({ ...NO_CAPTURE });
     return { ...NO_CAPTURE };
@@ -41,7 +41,27 @@ async function getCapture() {
 }
 
 async function setCapture(cap) {
-  await chrome.storage.session.set({ [CAPTURE_KEY]: cap });
+  await chrome.storage.session.set({ [CAPTURE_KEY]: { ...NO_CAPTURE, ...cap } });
+}
+
+async function getActiveTab() {
+  try {
+    const [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+    return tab || null;
+  } catch {
+    return null;
+  }
+}
+
+function resolveForTab(settings, tab) {
+  const host = tab && !blockedUrl(tab.url) ? hostOfUrl(tab.url) : "";
+  const resolved = resolveSettingsForHost(settings, host);
+  const activeOk = resolved.scope !== "active" || Boolean(tab?.active);
+  const shouldBoost = resolved.enabled && !resolved.excluded && activeOk;
+  return {
+    resolved,
+    effective: shouldBoost ? resolved : { ...resolved, enabled: false },
+  };
 }
 
 // ---- offscreen processor ---------------------------------------------------
@@ -80,13 +100,30 @@ async function sendOffscreen(message) {
   }
 }
 
+async function syncOffscreen(settings, cap) {
+  const c = cap || (await getCapture());
+  if (!c.tabId || !(await hasOffscreen())) return;
+  const s = settings || (await getSettings());
+  const tab = await chrome.tabs.get(c.tabId).catch(() => null);
+  if (!tab) return;
+  const { effective } = resolveForTab(s, tab);
+  await sendOffscreen({ type: "OFFSCREEN_SETTINGS", settings: effective });
+}
+
 // ---- badge -----------------------------------------------------------------
 
-async function updateBadge(settings) {
+async function updateBadge(settings, tab) {
   const s = settings || (await getSettings());
+  const activeTab = tab !== undefined ? tab : await getActiveTab();
+  const host = activeTab && !blockedUrl(activeTab.url) ? hostOfUrl(activeTab.url) : "";
+  const resolved = resolveSettingsForHost(s, host);
   try {
-    const on = s.enabled && !s.bypass;
-    const text = !s.enabled ? "off" : s.bypass ? "A/B" : `+${Math.round(s.boostDb)}`;
+    const on = resolved.enabled && !resolved.excluded && !resolved.bypass;
+    let text;
+    if (!resolved.enabled || resolved.excluded) text = "off";
+    else if (resolved.bypass) text = "A/B";
+    else if (resolved.autoLevel) text = "AUTO";
+    else text = `+${Math.round(resolved.boostDb)}`;
     await chrome.action.setBadgeText({ text });
     await chrome.action.setBadgeBackgroundColor({ color: on ? "#7ea58a" : "#6a6c72" });
     if (chrome.action.setBadgeTextColor) await chrome.action.setBadgeTextColor({ color: "#0a0b0d" });
@@ -102,26 +139,34 @@ function notifyTab(tabId, captured) {
   chrome.tabs.sendMessage(tabId, { type: "HR_CAPTURE_STATE", captured }).catch(() => {});
 }
 
-async function startCapture({ tabId, streamId, title }) {
+async function startCapture({ tabId, streamId, title, url }) {
   const prev = await getCapture();
   if (prev.tabId === tabId) return { ok: true };
   await ensureOffscreen();
   const settings = await getSettings();
-  const res = await sendOffscreen({ type: "OFFSCREEN_START_TAB", streamId, settings });
+  const tab = await chrome.tabs.get(tabId).catch(() => ({ id: tabId, title, url, active: true }));
+  const { effective } = resolveForTab(settings, tab);
+  const res = await sendOffscreen({ type: "OFFSCREEN_START_TAB", streamId, settings: effective });
   if (!res?.ok) {
     const error = res?.error || "Could not capture this tab.";
-    await setCapture({ ...NO_CAPTURE, error });
+    await setCapture({ ...NO_CAPTURE, error, errorTabId: tabId });
     return { ok: false, error };
   }
   if (prev.tabId && prev.tabId !== tabId) notifyTab(prev.tabId, false);
-  await setCapture({ tabId, title: title || "This tab", error: null });
+  await setCapture({
+    tabId,
+    title: tab?.title || title || "This tab",
+    url: tab?.url || url || "",
+    error: null,
+    errorTabId: null,
+  });
   notifyTab(tabId, true);
   return { ok: true };
 }
 
-async function stopCapture(error = null) {
+async function stopCapture(error = null, errorTabId = null) {
   const prev = await getCapture();
-  await setCapture({ ...NO_CAPTURE, error });
+  await setCapture({ ...NO_CAPTURE, error, errorTabId: error ? errorTabId || prev.tabId : null });
   notifyTab(prev.tabId, false);
   if (await hasOffscreen()) {
     await sendOffscreen({ type: "OFFSCREEN_STOP" });
@@ -140,10 +185,10 @@ async function captureTab(tab) {
   if (cap.tabId === tab.id) return { ok: true };
   try {
     const streamId = await chrome.tabCapture.getMediaStreamId({ targetTabId: tab.id });
-    return await startCapture({ tabId: tab.id, streamId, title: tab.title });
+    return await startCapture({ tabId: tab.id, streamId, title: tab.title, url: tab.url });
   } catch (err) {
     const error = err instanceof Error ? err.message : "Tab capture was blocked.";
-    await setCapture({ ...NO_CAPTURE, error });
+    await setCapture({ ...NO_CAPTURE, error, errorTabId: tab.id });
     return { ok: false, error };
   }
 }
@@ -169,15 +214,26 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       case "CAPTURE_STOP":
         sendResponse(await stopCapture());
         return;
+      case "CAPTURE_CLEAR_ERROR": {
+        const cap = await getCapture();
+        if (cap.error) await setCapture({ ...cap, error: null, errorTabId: null });
+        sendResponse({ ok: true });
+        return;
+      }
       case "CAPTURE_METERS": {
         const res = await sendOffscreen({ type: "OFFSCREEN_METERS" });
         sendResponse(res?.ok ? res : { ok: false, meters: ZERO_METERS });
         return;
       }
-      case "TRACK_ENDED":
-        await stopCapture("Captured audio ended. It will be captured again next time you open Headroom.");
+      case "TRACK_ENDED": {
+        const prev = await getCapture();
+        await stopCapture(
+          "Captured audio ended. It will be captured again next time you open Headroom.",
+          prev.tabId,
+        );
         sendResponse({ ok: true });
         return;
+      }
       default:
         sendResponse({ ok: false, error: "Unknown message." });
     }
@@ -190,7 +246,7 @@ chrome.storage.onChanged.addListener(async (changes, area) => {
   if (area !== "local" || !changes[STORAGE_KEY]) return;
   const settings = normalizeSettings(changes[STORAGE_KEY].newValue);
   void updateBadge(settings);
-  if (await hasOffscreen()) await sendOffscreen({ type: "OFFSCREEN_SETTINGS", settings });
+  await syncOffscreen(settings);
 });
 
 chrome.commands.onCommand.addListener(async (command, tab) => {
@@ -201,11 +257,26 @@ chrome.commands.onCommand.addListener(async (command, tab) => {
     return;
   }
   if (command === "deep-capture") {
-    const target = tab || (await chrome.tabs.query({ active: true, lastFocusedWindow: true }))[0];
+    const target = tab || (await getActiveTab());
     const cap = await getCapture();
     if (target && cap.tabId === target.id) await stopCapture();
     else await captureTab(target);
   }
+});
+
+chrome.tabs.onActivated.addListener(async ({ tabId }) => {
+  const [settings, tab] = await Promise.all([
+    getSettings(),
+    chrome.tabs.get(tabId).catch(() => null),
+  ]);
+  void updateBadge(settings, tab);
+  await syncOffscreen(settings);
+});
+
+chrome.windows.onFocusChanged.addListener(async (windowId) => {
+  if (windowId === chrome.windows.WINDOW_ID_NONE) return;
+  const settings = await getSettings();
+  void updateBadge(settings);
 });
 
 chrome.tabs.onRemoved.addListener(async (id) => {
@@ -213,11 +284,21 @@ chrome.tabs.onRemoved.addListener(async (id) => {
   if (cap.tabId === id) await stopCapture();
 });
 
-chrome.tabs.onUpdated.addListener(async (id, info) => {
-  if (!info.title && info.status !== "complete") return;
+chrome.tabs.onUpdated.addListener(async (id, info, tab) => {
+  if (tab?.active && (info.url || info.status === "complete")) {
+    void updateBadge(undefined, tab);
+  }
+  if (!info.title && !info.url && info.status !== "complete") return;
   const cap = await getCapture();
   if (cap.tabId !== id) return;
-  if (info.title) await setCapture({ ...cap, title: info.title });
+  if (info.title || info.url) {
+    await setCapture({
+      ...cap,
+      title: info.title || cap.title,
+      url: info.url || cap.url,
+    });
+  }
+  if (info.url) await syncOffscreen(undefined, { ...cap, url: info.url });
   if (info.status === "complete") notifyTab(id, true); // new page in a captured tab: stay neutral
 });
 

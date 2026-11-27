@@ -40,20 +40,24 @@
     }
   }
 
-  const isExcluded = () => settings.excludedSites.includes(topHost);
+  function effectiveSettings() {
+    return resolveSettingsForHost(settings, topHost);
+  }
 
-  function boostActive() {
+  function boostActive(eff) {
+    const s = eff || effectiveSettings();
     return (
-      settings.enabled &&
+      s.enabled &&
       !captured &&
-      !isExcluded() &&
-      (settings.scope !== "active" || document.visibilityState === "visible")
+      !s.excluded &&
+      (s.scope !== "active" || document.visibilityState === "visible")
     );
   }
 
   function apply() {
     if (!S.graph) return;
-    S.graph.applySettings(boostActive() ? settings : { ...settings, enabled: false });
+    const eff = effectiveSettings();
+    S.graph.applySettings(boostActive(eff) ? eff : { ...eff, enabled: false });
   }
 
   // Can this element be routed without going silent?

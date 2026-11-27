@@ -27,6 +27,9 @@ function teardownSource() {
     stream.getTracks().forEach((t) => t.stop());
     stream = null;
   }
+  if (graph) {
+    graph.applySettings({ ...currentSettings, enabled: false });
+  }
 }
 
 async function startTab(streamId, settings) {
